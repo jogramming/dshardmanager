@@ -141,6 +141,7 @@ func (m *Manager) startSession(shard int) error {
 	if err != nil {
 		return errors.Wrap(err, "startSession.Open")
 	}
+	m.handleEvent(EventOpen, shard, "")
 
 	m.Sessions[shard] = session
 	return nil
