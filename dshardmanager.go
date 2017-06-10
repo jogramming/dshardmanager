@@ -74,6 +74,20 @@ func New(token string, options ...func(m *Manager)) *Manager {
 	return manager
 }
 
+func (m *Manager) GetRecommendedCount() (int, error) {
+	resp, err := m.bareSession.GatewayBot()
+	if err != nil {
+		return 0, errors.WithMessage(err, "GetRecommendedCount()")
+	}
+
+	m.numShards = resp.Shards
+	if m.numShards < 1 {
+		m.numShards = 1
+	}
+
+	return m.numShards, nil
+}
+
 // Adds an event handler to all shards
 // All event handlers will be added to new sessions automatically.
 func (m *Manager) AddHandler(handler interface{}) {
@@ -89,21 +103,19 @@ func (m *Manager) AddHandler(handler interface{}) {
 }
 
 func (m *Manager) Start() error {
-	resp, err := m.bareSession.GatewayBot()
-	if err != nil {
-		return errors.WithMessage(err, "Start, GatewayBot()")
-	}
 
 	m.Lock()
 	defer m.Unlock()
-	m.numShards = resp.Shards
-	if m.numShards < 1 {
-		m.numShards = 1
+	if m.numShards < 0 {
+		_, err := m.GetRecommendedCount()
+		if err != nil {
+			return errors.WithMessage(err, "Start")
+		}
 	}
 
 	m.Sessions = make([]*discordgo.Session, m.numShards)
 	for i := 0; i < m.numShards; i++ {
-		err = m.startSession(i)
+		err := m.startSession(i)
 		if err != nil {
 			return errors.WithMessage(err, fmt.Sprintf("Failed starting shard %d", i))
 		}
