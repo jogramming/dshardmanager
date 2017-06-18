@@ -11,27 +11,38 @@ import (
 	"time"
 )
 
+const (
+	VersionMajor = 0
+	VersionMinor = 1
+	VersionPath  = 0
+)
+
+var (
+	VersionString = strconv.Itoa(VersionMajor) + "." + strconv.Itoa(VersionMinor) + "." + strconv.Itoa(VersionPath)
+)
+
 type SessionFunc func(token string) (*discordgo.Session, error)
 
 type Manager struct {
 	sync.RWMutex
 
+	// Name of the bot, to appear before log messages as a prefix
+	// and in the title of the updated status message
+	Name string
+
 	// All the shard sessions
 	Sessions      []*discordgo.Session
 	eventHandlers []interface{}
 
-	// Channel to log connection events and warnings in and keep the
-	// Updated status message in
+	// If set logs connection status events to this channel
 	LogChannel string
 
-	// Enable to log connection events to discord
-	LogConnectionEventsToDiscord bool
+	// If set keeps an updated satus message in this channel
+	StatusMessageChannel string
 
-	// Enables an updated status message in the channel
-	EnableUpdatedStatusMessageToDiscord bool
-
-	// GuildsProvider is used for stastics, it is required if you want the updating status message
-	GuildsProvider GuildsProvider
+	// The function that provides the guilds per shard, used fro the updated status message
+	// Should return a 2d slice, the first dimension being the shards and the second being the guild id's
+	GuildCountsFunc func() []int
 
 	// Called on events, by default this is set to a function that logs it to log.Printf
 	// You can override this if you want another behaviour, or just set it to nil for nothing.
@@ -56,20 +67,16 @@ type Manager struct {
 //
 // Example:
 // dshardmanager.New("Bot asd", OptLogChannel(someChannel), OptLogEventsToDiscord(true, true))
-func New(token string, options ...func(m *Manager)) *Manager {
+func New(token string) *Manager {
 	// Setup defaults
 	manager := &Manager{
-		token: token,
+		token:     token,
+		numShards: -1,
 	}
 	manager.OnEvent = manager.LogConnectionEventStd
 	manager.SessionFunc = manager.StdSessionFunc
-	manager.GuildsProvider = &StdGuildsProvider{Manager: manager}
 
 	manager.bareSession, _ = discordgo.New(token)
-
-	for _, v := range options {
-		v(manager)
-	}
 
 	return manager
 }
@@ -211,7 +218,7 @@ func (m *Manager) handleEvent(typ EventType, shard int, msg string) {
 
 	go m.OnEvent(evt)
 
-	if m.LogChannel != "" && m.LogConnectionEventsToDiscord {
+	if m.LogChannel != "" {
 		go m.logEventToDiscord(evt)
 	}
 
@@ -235,13 +242,18 @@ func (m *Manager) logEventToDiscord(evt *Event) {
 		return
 	}
 
+	prefix := ""
+	if m.Name != "" {
+		prefix = m.Name + ": "
+	}
+
 	str := evt.String()
-	_, err := m.bareSession.ChannelMessageSend(m.LogChannel, str)
+	_, err := m.bareSession.ChannelMessageSend(m.LogChannel, prefix+str)
 	m.handleError(err, evt.Shard, "Failed sending event to discord")
 }
 
 func (m *Manager) statusRoutine() {
-	if m.LogChannel == "" || !m.EnableUpdatedStatusMessageToDiscord || m.GuildsProvider == nil {
+	if m.StatusMessageChannel == "" {
 		return
 	}
 
@@ -284,14 +296,19 @@ func (m *Manager) updateStatusMessage(mID string) (string, error) {
 
 	content += "\n\nLast updated(UTC): " + time.Now().UTC().Format(time.RFC822)
 
+	nameStr := ""
+	if m.Name != "" {
+		nameStr = " for " + m.Name
+	}
+
 	embed := &discordgo.MessageEmbed{
-		Title:       "Shard statuses",
+		Title:       "Shard statuses" + nameStr,
 		Description: content,
 		Color:       0x4286f4,
 	}
 
 	if mID == "" {
-		msg, err := m.bareSession.ChannelMessageSendEmbed(m.LogChannel, embed)
+		msg, err := m.bareSession.ChannelMessageSendEmbed(m.StatusMessageChannel, embed)
 		if err != nil {
 			return "", err
 		}
@@ -299,12 +316,17 @@ func (m *Manager) updateStatusMessage(mID string) (string, error) {
 		return msg.ID, err
 	}
 
-	_, err := m.bareSession.ChannelMessageEditEmbed(m.LogChannel, mID, embed)
+	_, err := m.bareSession.ChannelMessageEditEmbed(m.StatusMessageChannel, mID, embed)
 	return mID, err
 }
 
 func (m *Manager) GetFullStatus() *Status {
-	guilds := m.GuildsProvider.ConnectedGuilds()
+	var shardGuilds []int
+	if m.GuildCountsFunc != nil {
+		shardGuilds = m.GuildCountsFunc()
+	} else {
+		shardGuilds = m.StdGuildCountsFunc()
+	}
 
 	m.RLock()
 
@@ -324,16 +346,33 @@ func (m *Manager) GetFullStatus() *Status {
 	}
 	m.RUnlock()
 
-	for _, id := range guilds {
-		parsed, _ := strconv.ParseInt(id, 10, 64)
-		shardID := (parsed >> 22) % int64(len(result))
-		result[shardID].Guilds++
+	totalGuilds := 0
+	for shard, guilds := range shardGuilds {
+		totalGuilds += guilds
+		result[shard].Guilds = guilds
 	}
 
 	return &Status{
 		Shards:    result,
-		NumGuilds: len(guilds),
+		NumGuilds: totalGuilds,
 	}
+}
+
+// StdGuildsFunc uses the standard states to return the guilds
+func (m *Manager) StdGuildCountsFunc() []int {
+
+	m.RLock()
+	nShards := m.numShards
+	result := make([]int, nShards)
+
+	for i, session := range m.Sessions {
+		session.State.RLock()
+		result[i] = len(session.State.Guilds)
+		session.State.RUnlock()
+	}
+
+	m.RUnlock()
+	return result
 }
 
 type Status struct {
@@ -345,29 +384,6 @@ type ShardStatus struct {
 	Shard  int
 	OK     bool
 	Guilds int
-}
-
-// The standard connected guilds provider
-type StdGuildsProvider struct {
-	Manager *Manager
-}
-
-func (s *StdGuildsProvider) ConnectedGuilds() []string {
-
-	s.Manager.RLock()
-	result := make([]string, 0, 100)
-
-	for _, v := range s.Manager.Sessions {
-		v.State.RLock()
-		for _, g := range v.State.Guilds {
-			result = append(result, g.ID)
-		}
-		v.State.RUnlock()
-	}
-
-	s.Manager.RUnlock()
-
-	return result
 }
 
 // Event holds data for an event
@@ -415,7 +431,7 @@ const (
 	// Sent when Open() is called
 	EventOpen
 
-	// Send when Close() is called
+	// Sent when Close() is called
 	EventClose
 
 	// Sent when an error occurs

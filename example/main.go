@@ -18,7 +18,7 @@ func main() {
 	flag.StringVar(&FlagLogChannel, "c", "", "Log channel, optional")
 	flag.Parse()
 
-	log.Println("Starting...")
+	log.Println("Starting v" + dshardmanager.VersionString)
 	if FlagToken == "" {
 		log.Fatal("No token specified")
 	}
@@ -27,8 +27,10 @@ func main() {
 		log.Fatal("dshardmanager only works on bot accounts, did you maybe forgot to add `Bot ` before the token?")
 	}
 
-	manager := dshardmanager.New(FlagToken,
-		dshardmanager.OptLogChannel(FlagLogChannel), dshardmanager.OptLogEventsToDiscord(true, true))
+	manager := dshardmanager.New(FlagToken)
+
+	manager.LogChannel = FlagLogChannel
+	manager.StatusMessageChannel = FlagLogChannel
 
 	log.Println("Starting the shard manager")
 	err := manager.Start()
