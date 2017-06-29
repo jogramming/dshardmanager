@@ -28,7 +28,7 @@ func main() {
 	}
 
 	manager := dshardmanager.New(FlagToken)
-
+	manager.Name = "ExampleBot"
 	manager.LogChannel = FlagLogChannel
 	manager.StatusMessageChannel = FlagLogChannel
 

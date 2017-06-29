@@ -13,7 +13,7 @@ import (
 
 const (
 	VersionMajor = 0
-	VersionMinor = 1
+	VersionMinor = 2
 	VersionPath  = 0
 )
 
@@ -301,7 +301,7 @@ func (m *Manager) statusRoutine() {
 			}
 
 			embed := msg.Embeds[0]
-			if embed.Title == "Shard statuses"+nameStr {
+			if embed.Title == "Sharding status"+nameStr {
 				// Found it sucessfully
 				mID = msg.ID
 				break
@@ -343,7 +343,7 @@ func (m *Manager) updateStatusMessage(mID string) (string, error) {
 		} else {
 			emoji = "🔥"
 		}
-		content += fmt.Sprintf("[%d/%d]: %s (%d,%d)\n", shard.Shard+1, len(status.Shards), emoji, shard.Guilds, status.NumGuilds)
+		content += fmt.Sprintf("[%d/%d]: %s (%d,%d)\n", shard.Shard+1, m.numShards, emoji, shard.Guilds, status.NumGuilds)
 	}
 
 	nameStr := ""
@@ -352,7 +352,7 @@ func (m *Manager) updateStatusMessage(mID string) (string, error) {
 	}
 
 	embed := &discordgo.MessageEmbed{
-		Title:       "Shard statuses" + nameStr,
+		Title:       "Sharding status" + nameStr,
 		Description: content,
 		Color:       0x4286f4,
 		Timestamp:   time.Now().Format(time.RFC3339),
