@@ -268,6 +268,32 @@ func (m *Manager) statusRoutine() {
 	}
 
 	mID := ""
+
+	// Find the initial message id and reuse that message if found
+	msgs, err := m.bareSession.ChannelMessages(m.StatusMessageChannel, 50, "", "", "")
+	if err != nil {
+		m.handleError(err, -1, "Failed requesting message history in channel")
+	} else {
+		for _, msg := range msgs {
+			// Dunno our own bot id so best we can do is bot
+			if msg.Author.Bot || len(msg.Embeds) < 1 {
+				continue
+			}
+
+			nameStr := ""
+			if m.Name != "" {
+				nameStr = " for " + m.Name
+			}
+
+			embed := msg.Embeds[0]
+			if embed.Title == "Shard statuses"+nameStr {
+				// Found it sucessfully
+				mID = msg.ID
+				break
+			}
+		}
+	}
+
 	ticker := time.NewTicker(time.Second)
 	for {
 		select {
@@ -295,7 +321,9 @@ func (m *Manager) updateStatusMessage(mID string) (string, error) {
 	status := m.GetFullStatus()
 	for _, shard := range status.Shards {
 		emoji := ""
-		if shard.OK {
+		if shard.NotStarted {
+			emoji = "🕒"
+		} else if shard.OK {
 			emoji = "👌"
 		} else {
 			emoji = "🔥"
@@ -345,7 +373,7 @@ func (m *Manager) GetFullStatus() *Status {
 		}
 
 		if shard == nil {
-			result[i].OK = false
+			result[i].NotStarted = true
 		} else {
 			shard.RLock()
 			result[i].OK = shard.DataReady
@@ -389,9 +417,10 @@ type Status struct {
 }
 
 type ShardStatus struct {
-	Shard  int
-	OK     bool
-	Guilds int
+	Shard      int
+	OK         bool
+	NotStarted bool
+	Guilds     int
 }
 
 // Event holds data for an event
