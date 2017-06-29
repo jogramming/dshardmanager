@@ -248,7 +248,13 @@ func (m *Manager) logEventToDiscord(evt *Event) {
 	}
 
 	str := evt.String()
-	_, err := m.bareSession.ChannelMessageSend(m.LogChannel, prefix+str)
+	embed := &discordgo.MessageEmbed{
+		Description: prefix + str,
+		Timestamp:   evt.Time.Format(time.RFC3339),
+		Color:       eventColors[evt.Type],
+	}
+
+	_, err := m.bareSession.ChannelMessageSendEmbed(m.LogChannel, embed)
 	m.handleError(err, evt.Shard, "Failed sending event to discord")
 }
 
@@ -275,7 +281,6 @@ func (m *Manager) statusRoutine() {
 					mID = nID
 				}
 			}
-
 		}
 	}
 }
@@ -294,8 +299,6 @@ func (m *Manager) updateStatusMessage(mID string) (string, error) {
 		content += fmt.Sprintf("[%d/%d]: %s (%d,%d)\n", shard.Shard+1, len(status.Shards), emoji, shard.Guilds, status.NumGuilds)
 	}
 
-	content += "\n\nLast updated(UTC): " + time.Now().UTC().Format(time.RFC822)
-
 	nameStr := ""
 	if m.Name != "" {
 		nameStr = " for " + m.Name
@@ -305,6 +308,7 @@ func (m *Manager) updateStatusMessage(mID string) (string, error) {
 		Title:       "Shard statuses" + nameStr,
 		Description: content,
 		Color:       0x4286f4,
+		Timestamp:   time.Now().Format(time.RFC3339),
 	}
 
 	if mID == "" {
@@ -447,6 +451,16 @@ var (
 		EventResumed:      "resumed",
 		EventReady:        "ready",
 		EventError:        "error",
+	}
+
+	eventColors = map[EventType]int{
+		EventOpen:         0xec58fc,
+		EventClose:        0xff7621,
+		EventConnected:    0x54d646,
+		EventDisconnected: 0xcc2424,
+		EventResumed:      0x5985ff,
+		EventReady:        0x00ffbf,
+		EventError:        0x7a1bad,
 	}
 )
 
