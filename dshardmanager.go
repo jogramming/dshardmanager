@@ -56,6 +56,7 @@ type Manager struct {
 	token     string
 
 	bareSession *discordgo.Session
+	started     bool
 }
 
 // New creates a new shard manager, after you have created this you call Manager.Start
@@ -95,6 +96,20 @@ func (m *Manager) GetRecommendedCount() (int, error) {
 	return m.numShards, nil
 }
 
+func (m *Manager) GetNumShards() int {
+	return m.numShards
+}
+
+func (m *Manager) SetNumShards(n int) {
+	m.Lock()
+	defer m.Unlock()
+	if m.started {
+		panic("Can't set num shard after started")
+	}
+
+	m.numShards = n
+}
+
 // Adds an event handler to all shards
 // All event handlers will be added to new sessions automatically.
 func (m *Manager) AddHandler(handler interface{}) {
@@ -124,7 +139,7 @@ func (m *Manager) Start() error {
 		go m.statusRoutine()
 	}
 	m.nextStatusUpdate = time.Now()
-	defer m.Unlock()
+	m.Unlock()
 
 	m.Sessions = make([]*discordgo.Session, m.numShards)
 	for i := 0; i < m.numShards; i++ {
@@ -276,7 +291,7 @@ func (m *Manager) statusRoutine() {
 	} else {
 		for _, msg := range msgs {
 			// Dunno our own bot id so best we can do is bot
-			if msg.Author.Bot || len(msg.Embeds) < 1 {
+			if !msg.Author.Bot || len(msg.Embeds) < 1 {
 				continue
 			}
 
@@ -402,6 +417,9 @@ func (m *Manager) StdGuildCountsFunc() []int {
 	result := make([]int, nShards)
 
 	for i, session := range m.Sessions {
+		if session == nil {
+			continue
+		}
 		session.State.RLock()
 		result[i] = len(session.State.Guilds)
 		session.State.RUnlock()

@@ -32,8 +32,16 @@ func main() {
 	manager.LogChannel = FlagLogChannel
 	manager.StatusMessageChannel = FlagLogChannel
 
+	reccomended, err := manager.GetRecommendedCount()
+	if err != nil {
+		log.Fatal("Failed getting reccomended shard count")
+	}
+	if reccomended < 2 {
+		manager.SetNumShards(5)
+	}
+
 	log.Println("Starting the shard manager")
-	err := manager.Start()
+	err = manager.Start()
 	if err != nil {
 		log.Fatal("Faled to start: ", err)
 	}
