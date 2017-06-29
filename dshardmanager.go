@@ -112,19 +112,10 @@ func (m *Manager) AddHandler(handler interface{}) {
 func (m *Manager) Start() error {
 
 	m.Lock()
-	defer m.Unlock()
 	if m.numShards < 0 {
 		_, err := m.GetRecommendedCount()
 		if err != nil {
 			return errors.WithMessage(err, "Start")
-		}
-	}
-
-	m.Sessions = make([]*discordgo.Session, m.numShards)
-	for i := 0; i < m.numShards; i++ {
-		err := m.startSession(i)
-		if err != nil {
-			return errors.WithMessage(err, fmt.Sprintf("Failed starting shard %d", i))
 		}
 	}
 
@@ -133,6 +124,19 @@ func (m *Manager) Start() error {
 		go m.statusRoutine()
 	}
 	m.nextStatusUpdate = time.Now()
+	defer m.Unlock()
+
+	m.Sessions = make([]*discordgo.Session, m.numShards)
+	for i := 0; i < m.numShards; i++ {
+		m.Lock()
+		err := m.startSession(i)
+		m.Unlock()
+		if err != nil {
+			return errors.WithMessage(err, fmt.Sprintf("Failed starting shard %d", i))
+		}
+		// One indentify every 5 seconds
+		time.Sleep(time.Second * 5)
+	}
 
 	return nil
 }
