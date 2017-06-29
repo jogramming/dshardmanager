@@ -40,13 +40,16 @@ type Manager struct {
 	// If set keeps an updated satus message in this channel
 	StatusMessageChannel string
 
-	// The function that provides the guilds per shard, used fro the updated status message
-	// Should return a 2d slice, the first dimension being the shards and the second being the guild id's
+	// The function that provides the guild counts per shard, used fro the updated status message
+	// Should return a slice of guild counts, with the index being the shard number
 	GuildCountsFunc func() []int
 
 	// Called on events, by default this is set to a function that logs it to log.Printf
 	// You can override this if you want another behaviour, or just set it to nil for nothing.
-	OnEvent     func(e *Event)
+	OnEvent func(e *Event)
+
+	// SessionFunc creates a new session and returns it, override the default one if you have your own
+	// session settings to apply
 	SessionFunc SessionFunc
 
 	nextStatusUpdate     time.Time
@@ -59,14 +62,8 @@ type Manager struct {
 	started     bool
 }
 
-// New creates a new shard manager, after you have created this you call Manager.Start
+// New creates a new shard manager with the defaults set, after you have created this you call Manager.Start
 // To start connecting
-//
-// options is a varadic argument of func(*Manager),
-// this is what this package uses for setup configuration
-// The appropiate functions are prefixed with Opt
-//
-// Example:
 // dshardmanager.New("Bot asd", OptLogChannel(someChannel), OptLogEventsToDiscord(true, true))
 func New(token string) *Manager {
 	// Setup defaults
@@ -74,6 +71,7 @@ func New(token string) *Manager {
 		token:     token,
 		numShards: -1,
 	}
+
 	manager.OnEvent = manager.LogConnectionEventStd
 	manager.SessionFunc = manager.StdSessionFunc
 
@@ -82,6 +80,9 @@ func New(token string) *Manager {
 	return manager
 }
 
+// GetRecommendedCount gets the reccomended sharding count from discord, this will also
+// set the shard count internally if called
+// Should not be called after calling Start(), will have undefined behaviour
 func (m *Manager) GetRecommendedCount() (int, error) {
 	resp, err := m.bareSession.GatewayBot()
 	if err != nil {
@@ -96,10 +97,13 @@ func (m *Manager) GetRecommendedCount() (int, error) {
 	return m.numShards, nil
 }
 
+// GetNumShards returns the current set number of shards
 func (m *Manager) GetNumShards() int {
 	return m.numShards
 }
 
+// SetNumShards sets the number of shards to use, if you want to override the reccomended count
+// Should not be called after calling Start(), will panic
 func (m *Manager) SetNumShards(n int) {
 	m.Lock()
 	defer m.Unlock()
@@ -124,10 +128,12 @@ func (m *Manager) AddHandler(handler interface{}) {
 	}
 }
 
+// Start starts the shard manager, opening all gateway connections and setting
+// numShards to the recomended count from discord if numShards is below 1
 func (m *Manager) Start() error {
 
 	m.Lock()
-	if m.numShards < 0 {
+	if m.numShards < 1 {
 		_, err := m.GetRecommendedCount()
 		if err != nil {
 			return errors.WithMessage(err, "Start")
@@ -185,7 +191,7 @@ func (m *Manager) startSession(shard int) error {
 	return nil
 }
 
-// Same as SessionForGuild but accepts the guildID as a string for convenience
+// SessionForGuildS is the same as SessionForGuild but accepts the guildID as a string for convenience
 func (m *Manager) SessionForGuildS(guildID string) *discordgo.Session {
 	// Question is, should we really ignore this error?
 	// In reality, the guildID should never be invalid but...
@@ -193,7 +199,7 @@ func (m *Manager) SessionForGuildS(guildID string) *discordgo.Session {
 	return m.SessionForGuild(parsed)
 }
 
-// Returns the session for the specified guild
+// SessionForGuild returns the session for the specified guild
 func (m *Manager) SessionForGuild(guildID int64) *discordgo.Session {
 	// (guild_id >> 22) % num_shards == shard_id
 	// That formula is taken from the sharding issue on the api docs repository on github
@@ -203,12 +209,14 @@ func (m *Manager) SessionForGuild(guildID int64) *discordgo.Session {
 	return m.Sessions[shardID]
 }
 
+// Session retrieves a session from the sessions map, rlocking it in the process
 func (m *Manager) Session(shardID int) *discordgo.Session {
 	m.RLock()
 	defer m.RUnlock()
 	return m.Sessions[shardID]
 }
 
+// LogConnectionEventStd is the standard connection event logger, it logs it to whatever log.output is set to.
 func (m *Manager) LogConnectionEventStd(e *Event) {
 	log.Printf("[Shard Manager] %s", e.String())
 }
@@ -248,6 +256,7 @@ func (m *Manager) handleEvent(typ EventType, shard int, msg string) {
 	}()
 }
 
+// StdSessionFunc is the standard session provider, it does nothing to the actual session
 func (m *Manager) StdSessionFunc(token string) (*discordgo.Session, error) {
 	s, err := discordgo.New(token)
 	if err != nil {
@@ -371,6 +380,7 @@ func (m *Manager) updateStatusMessage(mID string) (string, error) {
 	return mID, err
 }
 
+// GetFullStatus retrieves the full status at this instant
 func (m *Manager) GetFullStatus() *Status {
 	var shardGuilds []int
 	if m.GuildCountsFunc != nil {
