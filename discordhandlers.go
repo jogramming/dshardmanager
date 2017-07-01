@@ -1,7 +1,7 @@
 package dshardmanager
 
 import (
-	"github.com/bwmarrin/discordgo"
+	"github.com/jonas747/discordgo"
 )
 
 func (m *Manager) OnDiscordConnected(s *discordgo.Session, evt *discordgo.Connect) {
