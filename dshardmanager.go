@@ -162,6 +162,19 @@ func (m *Manager) Start() error {
 	return nil
 }
 
+// StopAll stops all the shard sessions and returns the last error that occured
+func (m *Manager) StopAll() (err error) {
+	m.Lock()
+	for _, v := range m.Sessions {
+		if e := v.Close(); e != nil {
+			err = e
+		}
+	}
+	m.Unlock()
+
+	return
+}
+
 func (m *Manager) startSession(shard int) error {
 	session, err := m.SessionFunc(m.token)
 	if err != nil {
