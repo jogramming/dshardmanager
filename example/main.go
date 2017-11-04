@@ -34,7 +34,7 @@ func main() {
 
 	reccomended, err := manager.GetRecommendedCount()
 	if err != nil {
-		log.Fatal("Failed getting reccomended shard count")
+		log.Fatal("Failed getting recommended shard count")
 	}
 	if reccomended < 2 {
 		manager.SetNumShards(5)
