@@ -32,11 +32,11 @@ func main() {
 	manager.LogChannel = FlagLogChannel
 	manager.StatusMessageChannel = FlagLogChannel
 
-	reccomended, err := manager.GetRecommendedCount()
+	recommended, err := manager.GetRecommendedCount()
 	if err != nil {
 		log.Fatal("Failed getting recommended shard count")
 	}
-	if reccomended < 2 {
+	if recommended < 2 {
 		manager.SetNumShards(5)
 	}
 
