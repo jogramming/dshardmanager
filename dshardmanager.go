@@ -80,7 +80,7 @@ func New(token string) *Manager {
 	return manager
 }
 
-// GetRecommendedCount gets the reccomended sharding count from discord, this will also
+// GetRecommendedCount gets the recommended sharding count from discord, this will also
 // set the shard count internally if called
 // Should not be called after calling Start(), will have undefined behaviour
 func (m *Manager) GetRecommendedCount() (int, error) {
@@ -102,7 +102,7 @@ func (m *Manager) GetNumShards() int {
 	return m.numShards
 }
 
-// SetNumShards sets the number of shards to use, if you want to override the reccomended count
+// SetNumShards sets the number of shards to use, if you want to override the recommended count
 // Should not be called after calling Start(), will panic
 func (m *Manager) SetNumShards(n int) {
 	m.Lock()
