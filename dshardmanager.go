@@ -358,14 +358,14 @@ func (m *Manager) updateStatusMessage(mID string) (string, error) {
 	status := m.GetFullStatus()
 	for _, shard := range status.Shards {
 		emoji := ""
-		if shard.NotStarted {
+		if !shard.Started {
 			emoji = "🕒"
 		} else if shard.OK {
 			emoji = "👌"
 		} else {
 			emoji = "🔥"
 		}
-		content += fmt.Sprintf("[%d/%d]: %s (%d,%d)\n", shard.Shard+1, m.numShards, emoji, shard.Guilds, status.NumGuilds)
+		content += fmt.Sprintf("[%d/%d]: %s (%d,%d)\n", shard.Shard+1, m.numShards, emoji, shard.NumGuilds, status.NumGuilds)
 	}
 
 	nameStr := ""
@@ -410,9 +410,9 @@ func (m *Manager) GetFullStatus() *Status {
 			Shard: i,
 		}
 
-		if shard == nil {
-			result[i].NotStarted = true
-		} else {
+		if shard != nil {
+			result[i].Started = true
+
 			shard.RLock()
 			result[i].OK = shard.DataReady
 			shard.RUnlock()
@@ -423,7 +423,7 @@ func (m *Manager) GetFullStatus() *Status {
 	totalGuilds := 0
 	for shard, guilds := range shardGuilds {
 		totalGuilds += guilds
-		result[shard].Guilds = guilds
+		result[shard].NumGuilds = guilds
 	}
 
 	return &Status{
@@ -453,15 +453,15 @@ func (m *Manager) StdGuildCountsFunc() []int {
 }
 
 type Status struct {
-	Shards    []*ShardStatus `json:"Shards"`
-	NumGuilds int 		 `json:"NumGuilds"`
+	Shards    []*ShardStatus `json:"shards"`
+	NumGuilds int            `json:"num_guilds"`
 }
 
 type ShardStatus struct {
-	Shard      int  `json:"Shard"`
-	OK         bool `json:"OK"`
-	NotStarted bool `json:"NotStarted"`
-	Guilds     int  `json:"Guilds"`
+	Shard     int  `json:"shard"`
+	OK        bool `json:"ok"`
+	Started   bool `json:"started"`
+	NumGuilds int  `json:"num_guilds"`
 }
 
 // Event holds data for an event
