@@ -453,15 +453,15 @@ func (m *Manager) StdGuildCountsFunc() []int {
 }
 
 type Status struct {
-	Shards    []*ShardStatus
-	NumGuilds int
+	Shards    []*ShardStatus `json:"Shards"`
+	NumGuilds int 		 `json:"NumGuilds"`
 }
 
 type ShardStatus struct {
-	Shard      int
-	OK         bool
-	NotStarted bool
-	Guilds     int
+	Shard      int  `json:"Shard"`
+	OK         bool `json:"OK"`
+	NotStarted bool `json:"NotStarted"`
+	Guilds     int  `json:"Guilds"`
 }
 
 // Event holds data for an event
