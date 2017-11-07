@@ -2,8 +2,12 @@ package main
 
 import (
 	"flag"
+	// "github.com/bwmarrin/discordgo"
 	"github.com/jonas747/dshardmanager"
 	"log"
+	"net/http"
+	_ "net/http/pprof"
+	"os"
 	"strings"
 )
 
@@ -20,7 +24,10 @@ func main() {
 
 	log.Println("Starting v" + dshardmanager.VersionString)
 	if FlagToken == "" {
-		log.Fatal("No token specified")
+		FlagToken = os.Getenv("DG_TOKEN")
+		if FlagToken == "" {
+			log.Fatal("No token specified")
+		}
 	}
 
 	if !strings.HasPrefix(FlagToken, "Bot ") {
@@ -47,5 +54,7 @@ func main() {
 	}
 
 	log.Println("Started!")
+
+	log.Fatal(http.ListenAndServe(":7441", nil))
 	select {}
 }
