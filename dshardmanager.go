@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/bwmarrin/discordgo"
 	"github.com/pkg/errors"
-	"log"
+	log "github.com/Sirupsen/logrus"
 	"strconv"
 	"strings"
 	"sync"
@@ -108,7 +108,7 @@ func (m *Manager) SetNumShards(n int) {
 	m.Lock()
 	defer m.Unlock()
 	if m.started {
-		panic("Can't set num shard after started")
+		panic("Can't set numShards after started")
 	}
 
 	m.numShards = n
@@ -231,7 +231,7 @@ func (m *Manager) Session(shardID int) *discordgo.Session {
 
 // LogConnectionEventStd is the standard connection event logger, it logs it to whatever log.output is set to.
 func (m *Manager) LogConnectionEventStd(e *Event) {
-	log.Printf("[Shard Manager] %s", e.String())
+	log.Infof("[Shard Manager] %s", e.String())
 }
 
 func (m *Manager) handleError(err error, shard int, msg string) bool {
