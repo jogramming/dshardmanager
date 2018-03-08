@@ -360,22 +360,29 @@ func (m *Manager) updateStatusMessage(mID string) (string, error) {
 
 	status := m.GetFullStatus()
 	for _, shard := range status.Shards {
-		emoji := ""
-		if !shard.Started {
-			emoji = "🕒"
-		} else if shard.OK {
-			emoji = "👌"
-		} else {
-			emoji = "🔥"
+		gwStatus := ""
+		switch shard.Status {
+		case discordgo.GatewayStatusConnecting:
+			gwStatus = "**Connecting...**"
+		case discordgo.GatewayStatusDisconnected:
+			gwStatus = "**Disconnected**"
+		case discordgo.GatewayStatusIdentifying:
+			gwStatus = "**Identifying**"
+		case discordgo.GatewayStatusResuming:
+			gwStatus = "**Resuming**"
+		case discordgo.GatewayStatusReady:
+			gwStatus = "👌"
+		default:
+			gwStatus = "?"
 		}
-		content += fmt.Sprintf("[%d/%d]: %s (%d,%d)\n", shard.Shard+1, m.numShards, emoji, shard.NumGuilds, status.NumGuilds)
+
+		content += fmt.Sprintf("[%d/%d]: %s (%d,%d)\n", shard.Shard+1, m.numShards, gwStatus, shard.NumGuilds, status.NumGuilds)
 	}
 
 	nameStr := ""
 	if m.Name != "" {
 		nameStr = " for " + m.Name
 	}
-
 	embed := &discordgo.MessageEmbed{
 		Title:       "Sharding status" + nameStr,
 		Description: content,
@@ -406,7 +413,6 @@ func (m *Manager) GetFullStatus() *Status {
 	}
 
 	m.RLock()
-
 	result := make([]*ShardStatus, len(m.Sessions))
 	for i, shard := range m.Sessions {
 		result[i] = &ShardStatus{
@@ -416,9 +422,7 @@ func (m *Manager) GetFullStatus() *Status {
 		if shard != nil {
 			result[i].Started = true
 
-			shard.RLock()
-			result[i].OK = shard.DataReady
-			shard.RUnlock()
+			result[i].Status = shard.GatewayManager.Status()
 		}
 	}
 	m.RUnlock()
@@ -461,10 +465,10 @@ type Status struct {
 }
 
 type ShardStatus struct {
-	Shard     int  `json:"shard"`
-	OK        bool `json:"ok"`
-	Started   bool `json:"started"`
-	NumGuilds int  `json:"num_guilds"`
+	Shard     int                     `json:"shard"`
+	Status    discordgo.GatewayStatus `json:"status"`
+	Started   bool                    `json:"started"`
+	NumGuilds int                     `json:"num_guilds"`
 }
 
 // Event holds data for an event
