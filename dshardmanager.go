@@ -128,10 +128,9 @@ func (m *Manager) AddHandler(handler interface{}) {
 	}
 }
 
-// Start starts the shard manager, opening all gateway connections and setting
-// numShards to the recomended count from discord if numShards is below 1
-func (m *Manager) Start() error {
-
+// Init initializesthe manager, retreiving the recommended shard count if needed
+// and initalizes all the shards
+func (m *Manager) Init() error {
 	m.Lock()
 	if m.numShards < 1 {
 		_, err := m.GetRecommendedCount()
@@ -140,14 +139,42 @@ func (m *Manager) Start() error {
 		}
 	}
 
+	m.Sessions = make([]*discordgo.Session, m.numShards)
+	for i := 0; i < m.numShards; i++ {
+		err := m.initSession(i)
+		if err != nil {
+			m.Unlock()
+			return errors.WithMessage(err, "initSession")
+		}
+	}
+
 	if !m.statusUpdaterStarted {
 		m.statusUpdaterStarted = true
 		go m.statusRoutine()
 	}
+
 	m.nextStatusUpdate = time.Now()
+
 	m.Unlock()
 
-	m.Sessions = make([]*discordgo.Session, m.numShards)
+	return nil
+}
+
+// Start starts the shard manager, opening all gateway connections
+func (m *Manager) Start() error {
+
+	m.Lock()
+	if m.Sessions == nil {
+		m.Unlock()
+		err := m.Init()
+		if err != nil {
+			return err
+		}
+		m.Lock()
+	}
+
+	m.Unlock()
+
 	for i := 0; i < m.numShards; i++ {
 		if i != 0 {
 			// One indentify every 5 seconds
@@ -178,7 +205,7 @@ func (m *Manager) StopAll() (err error) {
 	return
 }
 
-func (m *Manager) startSession(shard int) error {
+func (m *Manager) initSession(shard int) error {
 	session, err := m.SessionFunc(m.token)
 	if err != nil {
 		return errors.WithMessage(err, "startSession.SessionFunc")
@@ -197,13 +224,18 @@ func (m *Manager) startSession(shard int) error {
 		session.AddHandler(v)
 	}
 
-	err = session.Open()
+	m.Sessions[shard] = session
+	return nil
+}
+
+func (m *Manager) startSession(shard int) error {
+
+	err := m.Sessions[shard].Open()
 	if err != nil {
 		return errors.Wrap(err, "startSession.Open")
 	}
 	m.handleEvent(EventOpen, shard, "")
 
-	m.Sessions[shard] = session
 	return nil
 }
 
