@@ -35,10 +35,10 @@ type Manager struct {
 	eventHandlers []interface{}
 
 	// If set logs connection status events to this channel
-	LogChannel string
+	LogChannel int64
 
 	// If set keeps an updated satus message in this channel
-	StatusMessageChannel string
+	StatusMessageChannel int64
 
 	// The function that provides the guild counts per shard, used fro the updated status message
 	// Should return a slice of guild counts, with the index being the shard number
@@ -293,7 +293,7 @@ func (m *Manager) handleEvent(typ EventType, shard int, msg string) {
 
 	go m.OnEvent(evt)
 
-	if m.LogChannel != "" {
+	if m.LogChannel != 0 {
 		go m.logEventToDiscord(evt)
 	}
 
@@ -335,11 +335,11 @@ func (m *Manager) logEventToDiscord(evt *Event) {
 }
 
 func (m *Manager) statusRoutine() {
-	if m.StatusMessageChannel == "" {
+	if m.StatusMessageChannel == 0 {
 		return
 	}
 
-	mID := ""
+	var mID int64
 
 	// Find the initial message id and reuse that message if found
 	msgs, err := m.bareSession.ChannelMessages(m.StatusMessageChannel, 50, "", "", "")
@@ -387,7 +387,7 @@ func (m *Manager) statusRoutine() {
 	}
 }
 
-func (m *Manager) updateStatusMessage(mID string) (string, error) {
+func (m *Manager) updateStatusMessage(mID int64) (int64, error) {
 	content := ""
 
 	status := m.GetFullStatus()
@@ -422,10 +422,10 @@ func (m *Manager) updateStatusMessage(mID string) (string, error) {
 		Timestamp:   time.Now().Format(time.RFC3339),
 	}
 
-	if mID == "" {
+	if mID == 0 {
 		msg, err := m.bareSession.ChannelMessageSendEmbed(m.StatusMessageChannel, embed)
 		if err != nil {
-			return "", err
+			return 0, err
 		}
 
 		return msg.ID, err
