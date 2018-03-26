@@ -342,7 +342,7 @@ func (m *Manager) statusRoutine() {
 	var mID int64
 
 	// Find the initial message id and reuse that message if found
-	msgs, err := m.bareSession.ChannelMessages(m.StatusMessageChannel, 50, "", "", "")
+	msgs, err := m.bareSession.ChannelMessages(m.StatusMessageChannel, 50, 0, 0, 0)
 	if err != nil {
 		m.handleError(err, -1, "Failed requesting message history in channel")
 	} else {
