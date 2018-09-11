@@ -400,7 +400,7 @@ func (m *Manager) updateStatusMessage(mID string) (string, error) {
 		} else {
 			emoji = "🔥"
 		}
-		content += fmt.Sprintf("[%d/%d]: %s (%d,%d)\n", shard.Shard+1, m.numShards, emoji, shard.NumGuilds, status.NumGuilds)
+		content += fmt.Sprintf("[%d/%d]: %s (%d,%d)\n", shard.Shard, m.numShards, emoji, shard.NumGuilds, status.NumGuilds)
 	}
 
 	nameStr := ""
@@ -515,7 +515,7 @@ type Event struct {
 func (c *Event) String() string {
 	prefix := ""
 	if c.Shard > -1 {
-		prefix = fmt.Sprintf("[%d/%d] ", c.Shard+1, c.NumShards)
+		prefix = fmt.Sprintf("[%d/%d] ", c.Shard, c.NumShards)
 	}
 
 	s := fmt.Sprintf("%s%s", prefix, strings.Title(c.Type.String()))
